@@ -40,6 +40,7 @@
 #include "ap_config.h"
 #include "ap_mpm.h"
 #include "scoreboard.h"
+#include "apr_optional.h"
 
 #if APR_HAVE_NETINET_TCP_H
 #include <netinet/tcp.h>    /* for TCP_NODELAY */
@@ -478,6 +479,42 @@ AP_DECLARE_HOOK(void, child_stopping,
  * core's pre-config hook
  */
 void mpm_common_pre_config(apr_pool_t *pconf);
+
+/**
+ * Report a connection which the MPM did not accept itself, so that a child
+ * stopping gracefully waits for it like for its own connections.  Call
+ * ap_mpm_note_extra_connection_added() when such a connection starts and
+ * ap_mpm_note_extra_connection_removed() when it ends.
+ *
+ * @note Both are unavailable if the active MPM does not implement them, so
+ * the value returned by APR_RETRIEVE_OPTIONAL_FN() must be checked.
+ * @note A module noting connections is expected to detect that its child is
+ * stopping, e.g. with the child_stopping hook, and to end them in a timely
+ * manner, gracefully or not.
+ */
+APR_DECLARE_OPTIONAL_FN(void, ap_mpm_note_extra_connection_added, (void));
+APR_DECLARE_OPTIONAL_FN(void, ap_mpm_note_extra_connection_removed, (void));
+
+/**
+ * Make ap_mpm_note_extra_connection_added() and
+ * ap_mpm_note_extra_connection_removed() available to modules.  To be called
+ * from the pre-config hook of an MPM which waits for noted connections.
+ *
+ * @note An MPM which does not wait for them never calls this, leaving both
+ * functions unavailable.
+ */
+AP_DECLARE(void) ap_mpm_register_extra_connection_fns(void);
+
+/**
+ * Wait for the connections noted by modules to be gone, for no longer than
+ * max(Timeout, GracefulShutdownTimeout).  To be called by an MPM's child
+ * when it is about to exit gracefully, once its own connections are done.
+ *
+ * @note A warning is logged and the wait is given up if some noted
+ * connections are still around when the delay expires, possibly cutting
+ * them short.
+ */
+AP_DECLARE(void) ap_mpm_wait_for_extra_connections(void);
 
 #ifdef __cplusplus
 }

@@ -1272,7 +1272,6 @@ void child_main(apr_pool_t *pconf, DWORD parent_pid)
         }
     }
 
-    /* Kill remaining threads off the hard way */
     if (threads_created) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, APR_SUCCESS, ap_server_conf, APLOGNO(00363)
                      "Child: Terminating %d threads that failed to exit.",
@@ -1290,6 +1289,10 @@ void child_main(apr_pool_t *pconf, DWORD parent_pid)
     }
     ap_log_error(APLOG_MARK, APLOG_NOTICE, APR_SUCCESS, ap_server_conf, APLOGNO(00364)
                  "Child: All worker threads have exited.");
+
+    if (graceful_shutdown) {
+        ap_mpm_wait_for_extra_connections();
+    }
 
     apr_thread_mutex_destroy(child_lock);
     apr_thread_mutex_destroy(qlock);
